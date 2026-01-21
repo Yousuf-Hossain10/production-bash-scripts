@@ -1,0 +1,48 @@
+#!/bin/bash
+set -euo pipefail
+
+#############################################
+# Author      : Yousuf Hossain
+# Script Name : process_watcher.sh
+# Description : Restarts a process if not running
+# Usage       : ./process_watcher.sh <process_name> <start_command>
+#############################################
+
+LOG_FILE="/var/log/process_watcher.log"
+
+log() {
+    echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" | tee -a "$LOG_FILE"
+}
+
+usage() {
+    echo "Usage: $0 <process_name> <start_command>"
+    exit 1
+}
+
+is_running() {
+    pgrep -f "$1" > /dev/null 2>&1
+}
+
+main() {
+    [[ $# -lt 2 ]] && usage
+
+    PROCESS_NAME="$1"
+    START_COMMAND="$2"
+
+    if is_running "$PROCESS_NAME"; then
+        log "Process '$PROCESS_NAME' is running"
+    else
+        log "Process '$PROCESS_NAME' is NOT running. Restarting..."
+        eval "$START_COMMAND" &
+        sleep 2
+
+        if is_running "$PROCESS_NAME"; then
+            log "Process '$PROCESS_NAME' restarted successfully"
+        else
+            log "ERROR: Failed to restart '$PROCESS_NAME'"
+            exit 2
+        fi
+    fi
+}
+
+main "$@"

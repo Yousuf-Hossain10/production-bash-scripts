@@ -1,0 +1,44 @@
+#!/bin/bash
+set -euo pipefail
+
+#############################################
+# Author      : Yousuf Hossain
+# Script Name : directory_backup.sh
+# Description : Creates compressed backups with rotation
+# Usage       : ./directory_backup.sh /source /backup 7
+#############################################
+
+log() {
+    echo "$(date '+%Y-%m-%d %H:%M:%S') - $1"
+}
+
+usage() {
+    echo "Usage: $0 <source_dir> <backup_dir> <retention_days>"
+    exit 1
+}
+
+main() {
+    [[ $# -ne 3 ]] && usage
+
+    SOURCE_DIR="$1"
+    BACKUP_DIR="$2"
+    RETENTION_DAYS="$3"
+
+    TIMESTAMP=$(date '+%Y%m%d_%H%M%S')
+    BACKUP_FILE="${BACKUP_DIR}/backup_${TIMESTAMP}.tar.gz"
+
+    [[ ! -d "$SOURCE_DIR" ]] && { log "ERROR: Source directory not found"; exit 2; }
+
+    mkdir -p "$BACKUP_DIR"
+
+    log "Starting backup of $SOURCE_DIR"
+    tar -czf "$BACKUP_FILE" -C "$SOURCE_DIR" .
+    log "Backup created: $BACKUP_FILE"
+
+    log "Removing backups older than ${RETENTION_DAYS} days"
+    find "$BACKUP_DIR" -type f -name "*.tar.gz" -mtime +"$RETENTION_DAYS" -delete
+
+    log "Backup process completed successfully"
+}
+
+main "$@"

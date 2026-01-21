@@ -1,0 +1,60 @@
+#!/bin/bash
+set -euo pipefail
+
+#############################################
+# Author      : Yousuf Hossain
+# Script Name : website_health_check.sh
+# Description : Checks website availability and sends email alert
+# Usage       : ./website_health_check.sh https://example.com
+#############################################
+
+TIMEOUT=10
+MAX_RESPONSE_TIME=3
+EMAIL_TO="admin@example.com"
+LOG_FILE="/var/log/website_health_check.log"
+
+log() {
+    echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" | tee -a "$LOG_FILE"
+}
+
+usage() {
+    echo "Usage: $0 <website_url>"
+    exit 1
+}
+
+send_alert() {
+    local message="$1"
+    echo "$message" | mail -s "Website Health Alert" "$EMAIL_TO"
+}
+
+check_website() {
+    local url="$1"
+
+    response=$(curl -o /dev/null -s -w "%{http_code} %{time_total}" \
+        --max-time "$TIMEOUT" "$url" || echo "000 0")
+
+    http_code=$(echo "$response" | awk '{print $1}')
+    response_time=$(echo "$response" | awk '{print int($2)}')
+
+    if [[ "$http_code" != "200" ]]; then
+        log "ERROR: $url returned HTTP $http_code"
+        send_alert "Website $url is DOWN (HTTP $http_code)"
+        exit 2
+    fi
+
+    if (( response_time > MAX_RESPONSE_TIME )); then
+        log "WARNING: $url response time is ${response_time}s"
+        send_alert "Website $url is SLOW (${response_time}s)"
+    fi
+
+    log "SUCCESS: $url is healthy (HTTP 200, ${response_time}s)"
+}
+
+main() {
+    [[ $# -ne 1 ]] && usage
+    log "Starting website health check"
+    check_website "$1"
+    log "Website health check completed"
+}
+
+main "$@"

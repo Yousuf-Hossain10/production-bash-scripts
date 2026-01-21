@@ -1,0 +1,53 @@
+#!/bin/bash
+set -euo pipefail
+
+#############################################
+# Author      : Yousuf Hossain
+# Script Name : failed_ssh_login_alert.sh
+# Description : Detects repeated failed SSH login attempts
+# Usage       : ./failed_ssh_login_alert.sh
+#############################################
+
+LOG_FILE="/var/log/auth.log"
+ALERT_THRESHOLD=5
+EMAIL_TO="security@example.com"
+SCRIPT_LOG="/var/log/ssh_failed_login_alert.log"
+
+log() {
+    echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" | tee -a "$SCRIPT_LOG"
+}
+
+send_alert() {
+    local message="$1"
+    echo "$message" | mail -s "SSH Security Alert" "$EMAIL_TO"
+}
+
+check_log_file() {
+    [[ ! -f "$LOG_FILE" ]] && {
+        log "ERROR: SSH log file not found: $LOG_FILE"
+        exit 2
+    }
+}
+
+detect_failed_logins() {
+    log "Scanning SSH logs for failed login attempts"
+
+    awk '/Failed password/ {print $(NF-3)}' "$LOG_FILE" \
+        | sort \
+        | uniq -c \
+        | sort -nr \
+        | while read -r count ip; do
+            if (( count >= ALERT_THRESHOLD )); then
+                log "ALERT: $count failed SSH attempts from $ip"
+                send_alert "Detected $count failed SSH login attempts from IP: $ip"
+            fi
+        done
+}
+
+main() {
+    check_log_file
+    detect_failed_logins
+    log "SSH log scan completed"
+}
+
+main
